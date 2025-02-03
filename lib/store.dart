@@ -367,7 +367,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             Center(
               child: ElevatedButton(
                 onPressed: _addToCart,
-                child: const Text('Add to Cart'),
+                child: const Text('Add to to Cart'),
               ),
             ),
           ],
