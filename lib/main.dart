@@ -388,7 +388,7 @@ class RegisterPage extends StatelessWidget {
                         Navigator.pushNamed(context, '/store');
                       }
                     },
-                    child: const Text('Registerssssss'),
+                    child: const Text('Register'),
                   ),
                 ),
               ],
