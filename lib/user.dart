@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io'; // For handling File type
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase package
-import 'package:petco/main.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // For storing data locally
+import 'dart:convert'; // For JSON parsing
 
 class UserPage extends StatefulWidget {
   const UserPage({Key? key}) : super(key: key);
@@ -15,6 +15,7 @@ class _UserPageState extends State<UserPage> {
   File? _profileImage;
   String? _name;
   String? _email;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -22,13 +23,22 @@ class _UserPageState extends State<UserPage> {
     _getUserInfo();
   }
 
-  // Method to retrieve user information
+  // Method to retrieve user information from SharedPreferences
   Future<void> _getUserInfo() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataString = prefs.getString('user_data'); // Retrieve stored user data
+
+    if (userDataString != null) {
+      final userData = json.decode(userDataString); // Decode the JSON string
       setState(() {
-        _name = user.userMetadata['name'] as String? ?? 'No Name'; // Get name from metadata
-        _email = user.email ?? 'No Email'; // Get email
+        _name = userData['name'];
+        _email = userData['email'];
+        _isLoading = false;
+      });
+    } else {
+      // Handle case where user data is not available
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -36,8 +46,7 @@ class _UserPageState extends State<UserPage> {
   // Method to pick an image from the camera
   Future<void> _changeProfilePhoto() async {
     try {
-      final pickedImage =
-      await ImagePicker().pickImage(source: ImageSource.camera);
+      final pickedImage = await ImagePicker().pickImage(source: ImageSource.camera);
       if (pickedImage != null) {
         setState(() {
           _profileImage = File(pickedImage.path); // Update profile image
@@ -71,8 +80,7 @@ class _UserPageState extends State<UserPage> {
                     radius: orientation == Orientation.portrait ? 90 : 120,
                     backgroundImage: _profileImage != null
                         ? FileImage(_profileImage!) // Display captured image
-                        : const AssetImage('assets/user_avatar.png')
-                    as ImageProvider, // Default avatar
+                        : const AssetImage('assets/user_avatar.png') as ImageProvider, // Default avatar
                     child: _profileImage == null
                         ? const Icon(
                       Icons.person,
@@ -89,8 +97,7 @@ class _UserPageState extends State<UserPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: EdgeInsets.symmetric(
-                        horizontal:
-                        orientation == Orientation.portrait ? 40 : 60,
+                        horizontal: orientation == Orientation.portrait ? 40 : 60,
                         vertical: orientation == Orientation.portrait ? 10 : 15,
                       ),
                       shape: RoundedRectangleBorder(
@@ -102,19 +109,23 @@ class _UserPageState extends State<UserPage> {
                   const SizedBox(height: 20),
 
                   // User Information
-                  const Text(
-                    'Name',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
-                  ),
-                  Text(_name ?? 'Loading...'),
-                  const SizedBox(height: 10),
+                  if (_isLoading)
+                    const CircularProgressIndicator()
+                  else ...[
+                    const Text(
+                      'Name',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+                    ),
+                    Text(_name ?? 'No Name'),
+                    const SizedBox(height: 10),
 
-                  const Text(
-                    'Email',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
-                  ),
-                  Text(_email ?? 'Loading...'),
-                  const SizedBox(height: 20),
+                    const Text(
+                      'Email',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+                    ),
+                    Text(_email ?? 'No Email'),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Edit Profile and Logout Buttons
                   ElevatedButton(
@@ -124,8 +135,7 @@ class _UserPageState extends State<UserPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: EdgeInsets.symmetric(
-                        horizontal:
-                        orientation == Orientation.portrait ? 40 : 60,
+                        horizontal: orientation == Orientation.portrait ? 40 : 60,
                         vertical: orientation == Orientation.portrait ? 10 : 15,
                       ),
                       shape: RoundedRectangleBorder(
@@ -137,11 +147,12 @@ class _UserPageState extends State<UserPage> {
                   const SizedBox(height: 10),
 
                   TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MyApp()),
-                      );
+                    onPressed: () async {
+                      // Clear the token and user data, then navigate to the login page
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('auth_token');
+                      await prefs.remove('user_data');
+                      Navigator.pushReplacementNamed(context, '/');
                     },
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.red,

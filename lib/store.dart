@@ -1,11 +1,14 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'offline.dart'; // Import the offline page
 import 'service.dart';
 import 'user.dart';
 import 'order.dart';
-import 'package:petco/models/cart_item.dart';
-import 'package:petco/globals/globals.dart';
+import 'ProductService.dart';
+import 'package:petco/models/product.dart';
+import 'package:petco/models/cart_item.dart'; // Import CartItem
+import 'package:petco/globals/globals.dart'; // Import the global cart list
 
 class StorePage extends StatefulWidget {
   @override
@@ -14,7 +17,7 @@ class StorePage extends StatefulWidget {
 
 class _StorePageState extends State<StorePage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   bool _isOffline = false;
 
@@ -23,12 +26,12 @@ class _StorePageState extends State<StorePage> with SingleTickerProviderStateMix
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
 
-    // Listen to connectivity changes
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
-      if (result == ConnectivityResult.none) {
-        _showOfflineSnackbar();
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      // Check if none of the results indicate an active connection
+      if (results.isEmpty || results.contains(ConnectivityResult.none)) {
+        _showOfflinePage(); // Navigate to OfflinePage
       } else {
-        _dismissOfflineSnackbar();
+        _dismissOfflinePage(); // Navigate back to StorePage
       }
     });
   }
@@ -40,26 +43,31 @@ class _StorePageState extends State<StorePage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  void _showOfflineSnackbar() {
+  // Show the OfflinePage when offline
+  void _showOfflinePage() {
     if (!_isOffline) {
       setState(() {
         _isOffline = true;
       });
-      _scaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: const Text('You are offline. Please check your internet connection.'),
-          duration: const Duration(days: 1), // Keep showing until dismissed
-        ),
+      // Navigate to the OfflinePage
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => OfflinePage()), // Replace with your OfflinePage
       );
     }
   }
 
-  void _dismissOfflineSnackbar() {
+  // Dismiss the OfflinePage and go back to the StorePage when online
+  void _dismissOfflinePage() {
     if (_isOffline) {
       setState(() {
         _isOffline = false;
       });
-      _scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+      // Navigate back to the StorePage if the device is online
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => StorePage()), // Replace with your StorePage
+      );
     }
   }
 
@@ -85,10 +93,10 @@ class _StorePageState extends State<StorePage> with SingleTickerProviderStateMix
         body: TabBarView(
           controller: _tabController,
           children: [
-            StorePageContent(), // Content of the store page
-            ServicePage(),     // The new ServicesPage
-            OrderPage(),      // Replace with OrdersPage
-            UserPage(),      // Replace with UserPage
+            StorePageContent(),
+            ServicePage(),
+            OrderPage(),
+            UserPage(),
           ],
         ),
       ),
@@ -96,65 +104,57 @@ class _StorePageState extends State<StorePage> with SingleTickerProviderStateMix
   }
 }
 
-class StorePageContent extends StatelessWidget {
+class StorePageContent extends StatefulWidget {
+  @override
+  _StorePageContentState createState() => _StorePageContentState();
+}
+
+class _StorePageContentState extends State<StorePageContent> {
+  late Future<List<Product>> _futureProducts;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureProducts = ProductService.fetchProducts();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.of(context).size.width * 0.05,
-        vertical: MediaQuery.of(context).size.height * 0.02,
-      ),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Search for products',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: Theme.of(context).inputDecorationTheme.fillColor,
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Featured Products',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
           Expanded(
-            child: OrientationBuilder(
-              builder: (context, orientation) {
+            child: FutureBuilder<List<Product>>(
+              future: _futureProducts,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('No products available.'));
+                }
                 return GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: orientation == Orientation.portrait ? 2 : 4,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: orientation == Orientation.portrait ? 0.75 : 1.0,
+                    childAspectRatio: 0.75,
                   ),
-                  itemCount: 4, // Replace with dynamic item count if needed
+                  itemCount: snapshot.data!.length,
                   itemBuilder: (context, index) {
-                    final productName = index % 2 == 0 ? 'Dog Food' : 'Dog Toys';
-                    final productPrice = index % 2 == 0 ? '\$24.99' : '\$14.99';
-                    final productImage = index % 2 == 0
-                        ? 'https://via.placeholder.com/150/000000/FFFFFF/?text=Dog+Food'
-                        : 'https://via.placeholder.com/150/FF0000/FFFFFF/?text=Dog+Toys';
-
+                    final product = snapshot.data![index];
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => ProductDetailPage(
-                              name: productName,
-                              price: productPrice,
-                              image: productImage,
+                              name: product.name,
+                              price: '\$${product.price.toStringAsFixed(2)}',
+                              imageUrl: product.imageUrl,
                             ),
                           ),
                         );
@@ -165,38 +165,24 @@ class StorePageContent extends StatelessWidget {
                         ),
                         elevation: 2,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: ClipRRect(
-                                borderRadius:
-                                const BorderRadius.vertical(top: Radius.circular(10)),
-                                child: Image.network(
-                                  productImage,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                ),
-                              ),
+                              child: Image.network(product.imageUrl, fit: BoxFit.cover),
                             ),
                             Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    productName,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    productPrice,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
+                                  Text(product.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                  Text('\$${product.price.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      // Add the product to the cart
+                                      _addToCart(product);
+                                    },
+                                    child: const Text('Add to Cart'),
                                   ),
                                 ],
                               ),
@@ -214,165 +200,105 @@ class StorePageContent extends StatelessWidget {
       ),
     );
   }
-}
 
-class ProductDetailPage extends StatefulWidget {
-  final String name;
-  final String price;
-  final String image;
-
-  const ProductDetailPage({
-    Key? key,
-    required this.name,
-    required this.price,
-    required this.image,
-  }) : super(key: key);
-
-  @override
-  _ProductDetailPageState createState() => _ProductDetailPageState();
-}
-
-class _ProductDetailPageState extends State<ProductDetailPage> {
-  int _quantity = 1; // Default quantity
-  late double _price; // Parsed price
-  late double _totalPrice; // Total price
-
-  @override
-  void initState() {
-    super.initState();
-    _price = double.parse(widget.price.replaceAll('\$', ''));
-    _totalPrice = _price;
-  }
-
-  void _incrementQuantity() {
-    setState(() {
-      _quantity++;
-      _totalPrice = _quantity * _price;
-    });
-  }
-
-  void _decrementQuantity() {
-    if (_quantity > 1) {
-      setState(() {
-        _quantity--;
-        _totalPrice = _quantity * _price;
-      });
-    }
-  }
-
-  void _addToCart() {
-    // Check if item already exists in the cart
+  void _addToCart(Product product) {
+    // Check if the item already exists in the cart
     final existingItem = cart.firstWhere(
-          (item) => item.name == widget.name,
+          (item) => item.name == product.name,
       orElse: () => CartItem(name: '', price: 0, image: ''),
     );
 
     if (existingItem.name.isNotEmpty) {
-      setState(() {
-        existingItem.quantity += _quantity;
-      });
+      // If the item exists, increase the quantity
+      existingItem.quantity++;
     } else {
+      // If the item doesn't exist, add it to the cart
       cart.add(CartItem(
-        name: widget.name,
-        price: _price,
-        image: widget.image,
-        quantity: _quantity,
+        name: product.name,
+        price: product.price,
+        image: product.imageUrl,
       ));
     }
 
-    // Navigate to Order Page
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const OrderPage()),
+    // Show a confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${product.name} added to cart!'),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
+}
+
+class ProductDetailPage extends StatelessWidget {
+  final String name;
+  final String price;
+  final String imageUrl;
+
+  const ProductDetailPage({
+    required this.name,
+    required this.price,
+    required this.imageUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.name),
-      ),
+      appBar: AppBar(title: Text(name)),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: isPortrait
-            ? Column(
-          children: _buildProductDetails(context),
-        )
-            : Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: _buildProductDetails(context),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildProductDetails(BuildContext context) {
-    return [
-      Expanded(
-        child: Image.network(
-          widget.image,
-          fit: BoxFit.cover,
-        ),
-      ),
-      const SizedBox(width: 20),
-      Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.name,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '\$${_price.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 20,
-                color: Colors.grey,
-              ),
-            ),
+            Image.network(imageUrl),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  onPressed: _decrementQuantity,
-                  icon: const Icon(Icons.remove),
-                ),
-                Text(
-                  '$_quantity',
-                  style: const TextStyle(fontSize: 20),
-                ),
-                IconButton(
-                  onPressed: _incrementQuantity,
-                  icon: const Icon(Icons.add),
-                ),
-              ],
-            ),
+            Text(name, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text(
-              'Total: \$${_totalPrice.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(price, style: TextStyle(fontSize: 20, color: Colors.green)),
             const SizedBox(height: 20),
             Center(
               child: ElevatedButton(
-                onPressed: _addToCart,
-                child: const Text('Add to to Cart'),
+                onPressed: () {
+                  // Add the product to the cart
+                  _addToCart(context);
+                },
+                child: const Text('Add to Cart'),
               ),
             ),
           ],
         ),
       ),
-    ];
+    );
+  }
+
+  void _addToCart(BuildContext context) {
+    // Create a CartItem from the Product
+    final cartItem = CartItem(
+      name: name,
+      price: double.parse(price.replaceAll('\$', '')),
+      image: imageUrl,
+    );
+
+    // Check if the item already exists in the cart
+    final existingItem = cart.firstWhere(
+          (item) => item.name == name,
+      orElse: () => CartItem(name: '', price: 0, image: ''),
+    );
+
+    if (existingItem.name.isNotEmpty) {
+      // If the item exists, increase the quantity
+      existingItem.quantity++;
+    } else {
+      // If the item doesn't exist, add it to the cart
+      cart.add(cartItem);
+    }
+
+    // Show a confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$name added to cart!'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 }

@@ -1,5 +1,4 @@
 // lib/models/cart_item.dart
-
 class CartItem {
   final String name; // Name of the product
   final double price; // Price of the product
@@ -13,6 +12,5 @@ class CartItem {
     this.quantity = 1,
   });
 
-  // Helper method to calculate the total price for this cart item
   double get totalPrice => quantity * price;
 }

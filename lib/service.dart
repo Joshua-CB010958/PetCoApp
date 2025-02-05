@@ -38,17 +38,16 @@ class ServicePage extends StatelessWidget {
                   return ListView(
                     children: [
                       ServiceCard(
-                        imageUrl: 'https://via.placeholder.com/300x200',
+                        imageAsset: 'assets/vaccine.jpg',
                         title: 'Vaccine Service',
                         description: 'Get your pet vaccinated with the best care.',
                       ),
                       const SizedBox(height: 20),
                       ServiceCard(
-                        imageUrl: 'https://via.placeholder.com/300x200',
+                        imageAsset: 'assets/appoint.jpg',
                         title: 'Vet Appointment',
                         description: 'Schedule an appointment with a certified vet.',
                       ),
-                      // Add more cards here if needed
                     ],
                   );
                 },
@@ -62,12 +61,12 @@ class ServicePage extends StatelessWidget {
 }
 
 class ServiceCard extends StatelessWidget {
-  final String imageUrl;
+  final String imageAsset;
   final String title;
   final String description;
 
   const ServiceCard({
-    required this.imageUrl,
+    required this.imageAsset,
     required this.title,
     required this.description,
   });
@@ -82,7 +81,7 @@ class ServiceCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => ProductPage(
-              imageUrl: imageUrl,
+              imageAsset: imageAsset,
               title: title,
               description: description,
             ),
@@ -99,9 +98,9 @@ class ServiceCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-              child: Image.network(
-                imageUrl,
-                height: isPortrait ? 150 : 200, // Adjust height based on orientation
+              child: Image.asset(
+                imageAsset,
+                height: isPortrait ? 150 : 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
               ),
@@ -134,12 +133,12 @@ class ServiceCard extends StatelessWidget {
 }
 
 class ProductPage extends StatelessWidget {
-  final String imageUrl;
+  final String imageAsset;
   final String title;
   final String description;
 
   const ProductPage({
-    required this.imageUrl,
+    required this.imageAsset,
     required this.title,
     required this.description,
   });
@@ -157,8 +156,8 @@ class ProductPage extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                imageUrl,
+              child: Image.asset(
+                imageAsset,
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
